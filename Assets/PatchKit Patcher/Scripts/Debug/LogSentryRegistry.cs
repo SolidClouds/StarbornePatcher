@@ -3,6 +3,7 @@ using System.Net;
 using PatchKit.IssueReporting;
 using SharpRaven;
 using SharpRaven.Data;
+using PatchKit.Apps.Updating;
 
 namespace PatchKit.Patching.Unity.Debug
 {
@@ -61,6 +62,12 @@ namespace PatchKit.Patching.Unity.Debug
                 if (patcher.RemoteVersionId.Value.HasValue)
                 {
                     sentryEvent.Exception.Data.Add("remote-version", patcher.RemoteVersionId.Value.ToString());
+                }
+
+                if (DependencyResolver.IsRegistered<ISystemInfoProvider>())
+                {
+                    var systemInfoProvider = DependencyResolver.Resolve<ISystemInfoProvider>();
+                    sentryEvent.Tags.Add("system-info", systemInfoProvider.SystemInfo);
                 }
 
                 sentryEvent.Tags.Add("patcher-version", Version.Value);

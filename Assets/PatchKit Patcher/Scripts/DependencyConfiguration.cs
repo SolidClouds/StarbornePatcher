@@ -5,6 +5,7 @@ using PatchKit.Apps.Updating.AppData.Remote.Downloaders;
 using PatchKit.Apps.Updating.Utilities;
 using PatchKit.Core.IO;
 using PatchKit.Logging;
+using PatchKit.Patching.Unity.Debug;
 using UnityEngine;
 using ILogger = PatchKit.Logging.ILogger;
 
@@ -37,6 +38,7 @@ namespace PatchKit.Patching.Unity
             //DependencyResolver.RegisterType<IHttpClient, UnityHttpClient>();
 
             DependencyResolver.ContainerBuilder.RegisterType<UnityDiskSpaceChecker>().As<IDiskSpaceChecker>();
+            DependencyResolver.ContainerBuilder.RegisterType<UnitySystemInfoProvider>().As<ISystemInfoProvider>();
 
             DependencyResolver.Build();
         }
