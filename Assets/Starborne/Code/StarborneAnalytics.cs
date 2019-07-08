@@ -6,21 +6,6 @@ namespace PatchKit.Unity.Patcher.UI
 {
 	public static class LauncherAnalytics
 	{
-		public static void PlayButtonVisible()
-		{
-			SendEvent("Play Button Visible");
-		}
-
-		public static void PlayButtonPressed()
-		{
-			SendEvent("Play Button Pressed");
-		}
-
-		public static void CheckForUpdatesPressed()
-		{
-			SendEvent("Check for Updates Pressed");
-		}
-
 		private static void SendEvent(string eventName)
 		{
 			if (CheckAndMarkDone(eventName))
@@ -35,26 +20,6 @@ namespace PatchKit.Unity.Patcher.UI
 			PlayerPrefs.SetInt(eventName, 1);
 			PlayerPrefs.Save();
 			return firstTimePressing;
-		}
-
-		internal static void LoadingData()
-		{
-			SendEvent("Loading Data");
-		}
-
-		internal static void StartingApp()
-		{
-			SendEvent("Starting App");
-		}
-
-		internal static void UpdatingApp(string description)
-		{
-			SendEvent("Updating: " + description);
-		}
-
-		internal static void LoadingConfiguration()
-		{
-			SendEvent("Loading Configuration");
 		}
 	}
 }

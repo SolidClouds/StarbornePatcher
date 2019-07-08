@@ -3,6 +3,7 @@ using System.Linq;
 using PatchKit.Api.Utilities;
 using PatchKit.Unity.Patcher.Cancellation;
 using PatchKit.Unity.Utilities;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,7 +13,7 @@ namespace PatchKit.Unity.UI
     {
         [Multiline] public string Format = "<b>{label}</b>\n{changelog}\n\n";
 
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         protected override IEnumerator LoadCoroutine()
         {
@@ -37,7 +38,7 @@ namespace PatchKit.Unity.UI
         {
             if (Text == null)
             {
-                Text = GetComponent<Text>();
+                Text = GetComponent<TextMeshProUGUI>();
             }
         }
     }

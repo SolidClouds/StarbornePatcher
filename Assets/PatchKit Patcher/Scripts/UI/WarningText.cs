@@ -1,4 +1,5 @@
 ﻿using System;
+using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,7 +8,7 @@ namespace PatchKit.Unity.Patcher.UI
 {
     public class WarningText : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         private void Start()
         {

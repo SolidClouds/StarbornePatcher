@@ -7,8 +7,10 @@ using UnityEngine.UI;
 namespace PatchKit.Unity.Patcher.UI.Dialogs
 {
     public class LicenseDialog : Dialog<LicenseDialog>, ILicenseDialog
-    {
-        private LicenseDialogResult _result;
+	{
+		public static new LicenseDialog Instance { get; } = new LicenseDialog();
+
+		private LicenseDialogResult _result;
 
         public Text ErrorMessageText;
 

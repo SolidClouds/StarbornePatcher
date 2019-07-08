@@ -2,14 +2,15 @@
 using UnityEngine.UI;
 using UniRx;
 using PatchKit.Unity.Patcher.Debug;
+using TMPro;
 
 namespace PatchKit.Unity
 {
     public class GameTitle : MonoBehaviour
-    {
-        public Text Text;
+	{
+		public TextMeshProUGUI Text;
 
-        private void Start()
+		private void Start()
         {
             var patcher = Patcher.Patcher.Instance;
 

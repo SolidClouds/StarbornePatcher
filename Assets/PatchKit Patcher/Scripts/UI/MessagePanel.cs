@@ -1,4 +1,5 @@
-﻿using UniRx;
+﻿using TMPro;
+using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,7 +12,7 @@ namespace PatchKit.Unity.Patcher.UI
 
         public Button CheckButton;
 
-        public Text CheckButtonText;
+        public TextMeshProUGUI CheckButtonText;
 
         private bool _canInstallApp;
 

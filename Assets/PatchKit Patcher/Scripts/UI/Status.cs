@@ -1,5 +1,6 @@
 ﻿using System;
 using PatchKit.Unity.Utilities;
+using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,7 +9,7 @@ namespace PatchKit.Unity.Patcher.UI
 {
     public class Status : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         private void Start()
         {

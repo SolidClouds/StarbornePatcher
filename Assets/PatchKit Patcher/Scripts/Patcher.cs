@@ -21,925 +21,941 @@ using PatchKit.Unity.Patcher.AppUpdater.Status;
 
 namespace PatchKit.Unity.Patcher
 {
-    // Assumptions:
-    // - this component is always enabled (coroutines are always executed)
-    // - this component is destroyed only when application quits
-    public class Patcher : MonoBehaviour
-    {
-        public const string EditorAllowedSecret = "ac20fc855b75a7ea5f3e936dfd38ccd8";
+	// Assumptions:
+	// - this component is always enabled (coroutines are always executed)
+	// - this component is destroyed only when application quits
+	public class Patcher : MonoBehaviour
+	{
+		public const string EditorAllowedSecret = "ac20fc855b75a7ea5f3e936dfd38ccd8";
 
-        public enum UserDecision
-        {
-            None,
-            RepairApp,
-            StartApp,
-            StartAppAutomatically,
-            InstallApp,
-            InstallAppAutomatically,
-            CheckForAppUpdates,
-            CheckForAppUpdatesAutomatically
-        }
+		public enum UserDecision
+		{
+			None,
+			RepairApp,
+			StartApp,
+			StartAppAutomatically,
+			InstallApp,
+			InstallAppAutomatically,
+			CheckForAppUpdates,
+			CheckForAppUpdatesAutomatically,
+			AppUpdatesOnly,
+		}
 
-        private static readonly DebugLogger DebugLogger = new DebugLogger(typeof(Patcher));
+		private static readonly DebugLogger DebugLogger = new DebugLogger(typeof(Patcher));
 
-        private static Patcher _instance;
+		private static Patcher _instance;
 
-        public static Patcher Instance
-        {
-            get
-            {
-                if (_instance == null)
-                {
-                    _instance = FindObjectOfType<Patcher>();
-                }
-                return _instance;
-            }
-        }
+		public static Patcher Instance
+		{
+			get
+			{
+				if (_instance == null)
+				{
+					_instance = FindObjectOfType<Patcher>();
+				}
+				return _instance;
+			}
+		}
 
-        private bool _canStartThread = true;
+		private bool _canStartThread = true;
 
-        private readonly PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource _threadCancellationTokenSource = new PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource();
+		private readonly PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource _threadCancellationTokenSource = new PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource();
 
-        private Thread _thread;
+		private Thread _thread;
 
-        private bool _isForceQuitting;
+		private bool _isForceQuitting;
 
-        private App _app;
+		private App _app;
 
-        private PatcherConfiguration _configuration;
+		private PatcherConfiguration _configuration;
 
-        private UserDecision _userDecision = UserDecision.None;
+		private UserDecision _userDecision = UserDecision.None;
 
-        private readonly ManualResetEvent _userDecisionSetEvent = new ManualResetEvent(false);
+		private readonly ManualResetEvent _userDecisionSetEvent = new ManualResetEvent(false);
 
-        private readonly IRequestTimeoutCalculator _requestTimeoutCalculator = new SimpleRequestTimeoutCalculator();
+		private readonly IRequestTimeoutCalculator _requestTimeoutCalculator = new SimpleRequestTimeoutCalculator();
 
-        private bool _hasAutomaticallyInstalledApp;
+		private bool _hasAutomaticallyInstalledApp;
 
-        private bool _hasAutomaticallyCheckedForAppUpdate;
+		private bool _hasAutomaticallyCheckedForAppUpdate;
 
-        private bool _hasAutomaticallyStartedApp;
+		private bool _hasAutomaticallyStartedApp;
 
-        private bool _wasUpdateSuccessfulOrNotNecessary = false;
-        private bool _hasGameBeenStarted = false;
+		private bool _wasUpdateSuccessfulOrNotNecessary = false;
+		private bool _hasGameBeenStarted = false;
 
-        private FileStream _lockFileStream;
+		private FileStream _lockFileStream;
 
-        private PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource _updateAppCancellationTokenSource;
+		private PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource _updateAppCancellationTokenSource;
 
-        public ErrorDialog ErrorDialog;
+		public ErrorDialog ErrorDialog;
 
-        public string EditorAppSecret;
+		public string EditorAppSecret;
 
-        public int EditorOverrideLatestVersionId;
+		public int EditorOverrideLatestVersionId;
 
-        public PatcherConfiguration DefaultConfiguration;
+		public PatcherConfiguration DefaultConfiguration;
 
-        private readonly ReactiveProperty<IReadOnlyUpdaterStatus> _updaterStatus = new ReactiveProperty<IReadOnlyUpdaterStatus>();
+		private readonly ReactiveProperty<IReadOnlyUpdaterStatus> _updaterStatus = new ReactiveProperty<IReadOnlyUpdaterStatus>();
 
-        public IReadOnlyReactiveProperty<IReadOnlyUpdaterStatus> UpdaterStatus
-        {
-            get { return _updaterStatus; }
-        }
+		public IReadOnlyReactiveProperty<IReadOnlyUpdaterStatus> UpdaterStatus
+		{
+			get { return _updaterStatus; }
+		}
 
-        private readonly BoolReactiveProperty _canRepairApp = new BoolReactiveProperty(false);
+		private readonly BoolReactiveProperty _canRepairApp = new BoolReactiveProperty(false);
 
-        public IReadOnlyReactiveProperty<bool> CanRepairApp
-        {
-            get { return _canRepairApp; }
-        }
+		public IReadOnlyReactiveProperty<bool> CanRepairApp
+		{
+			get { return _canRepairApp; }
+		}
 
-        private readonly BoolReactiveProperty _canStartApp = new BoolReactiveProperty(false);
+		private readonly BoolReactiveProperty _canStartApp = new BoolReactiveProperty(false);
 
-        public IReadOnlyReactiveProperty<bool> CanStartApp
-        {
-            get { return _canStartApp; }
-        }
+		public IReadOnlyReactiveProperty<bool> CanStartApp
+		{
+			get { return _canStartApp; }
+		}
 
-        private readonly BoolReactiveProperty _isAppInstalled = new BoolReactiveProperty(false);
+		private readonly BoolReactiveProperty _isAppInstalled = new BoolReactiveProperty(false);
 
-        public IReadOnlyReactiveProperty<bool> IsAppInstalled
-        {
-            get { return _isAppInstalled; }
-        }
+		public IReadOnlyReactiveProperty<bool> IsAppInstalled
+		{
+			get { return _isAppInstalled; }
+		}
 
-        private readonly BoolReactiveProperty _canInstallApp = new BoolReactiveProperty(false);
+		private readonly BoolReactiveProperty _canInstallApp = new BoolReactiveProperty(false);
 
-        public IReadOnlyReactiveProperty<bool> CanInstallApp
-        {
-            get { return _canInstallApp; }
-        }
+		public IReadOnlyReactiveProperty<bool> CanInstallApp
+		{
+			get { return _canInstallApp; }
+		}
 
-        private readonly BoolReactiveProperty _canCheckForAppUpdates = new BoolReactiveProperty(false);
+		private readonly BoolReactiveProperty _canCheckForAppUpdates = new BoolReactiveProperty(false);
 
-        public IReadOnlyReactiveProperty<bool> CanCheckForAppUpdates
-        {
-            get { return _canCheckForAppUpdates; }
-        }
+		public IReadOnlyReactiveProperty<bool> CanCheckForAppUpdates
+		{
+			get { return _canCheckForAppUpdates; }
+		}
 
-        private readonly ReactiveProperty<PatcherState> _state = new ReactiveProperty<PatcherState>(PatcherState.None);
+		private readonly ReactiveProperty<PatcherState> _state = new ReactiveProperty<PatcherState>(PatcherState.None);
 
-        public IReadOnlyReactiveProperty<PatcherState> State
-        {
-            get { return _state; }
-        }
+		public IReadOnlyReactiveProperty<PatcherState> State
+		{
+			get { return _state; }
+		}
 
-        private readonly ReactiveProperty<PatcherData> _data = new ReactiveProperty<PatcherData>();
+		private readonly ReactiveProperty<PatcherData> _data = new ReactiveProperty<PatcherData>();
 
-        public IReadOnlyReactiveProperty<PatcherData> Data
-        {
-            get { return _data; }
-        }
+		public IReadOnlyReactiveProperty<PatcherData> Data
+		{
+			get { return _data; }
+		}
 
-        private readonly ReactiveProperty<string> _warning = new ReactiveProperty<string>();
+		private readonly ReactiveProperty<string> _warning = new ReactiveProperty<string>();
 
-        public IReadOnlyReactiveProperty<string> Warning
-        {
-            get { return _warning; }
-        }
+		public IReadOnlyReactiveProperty<string> Warning
+		{
+			get { return _warning; }
+		}
 
-        private readonly ReactiveProperty<int?> _remoteVersionId = new ReactiveProperty<int?>();
+		private readonly ReactiveProperty<int?> _remoteVersionId = new ReactiveProperty<int?>();
 
-        public IReadOnlyReactiveProperty<int?> RemoteVersionId
-        {
-            get { return _remoteVersionId; }
-        }
+		public IReadOnlyReactiveProperty<int?> RemoteVersionId
+		{
+			get { return _remoteVersionId; }
+		}
 
-        private readonly ReactiveProperty<int?> _localVersionId = new ReactiveProperty<int?>();
+		private readonly ReactiveProperty<int?> _localVersionId = new ReactiveProperty<int?>();
 
-        public IReadOnlyReactiveProperty<int?> LocalVersionId
-        {
-            get { return _localVersionId; }
-        }
+		public IReadOnlyReactiveProperty<int?> LocalVersionId
+		{
+			get { return _localVersionId; }
+		}
 
-        private readonly ReactiveProperty<Api.Models.Main.App> _appInfo = new ReactiveProperty<Api.Models.Main.App>();
+		private readonly ReactiveProperty<Api.Models.Main.App> _appInfo = new ReactiveProperty<Api.Models.Main.App>();
 
-        public IReadOnlyReactiveProperty<Api.Models.Main.App> AppInfo
-        {
-            get { return _appInfo; }
-        }
+		public IReadOnlyReactiveProperty<Api.Models.Main.App> AppInfo
+		{
+			get { return _appInfo; }
+		}
 
-        public void SetUserDecision(UserDecision userDecision)
-        {
-            DebugLogger.Log(string.Format("User deicision set to {0}.", userDecision));
+		public void SetUserDecision(UserDecision userDecision)
+		{
+			DebugLogger.Log(string.Format("User deicision set to {0}.", userDecision));
 
-            _userDecision = userDecision;
-            _userDecisionSetEvent.Set();
-        }
+			_userDecision = userDecision;
+			_userDecisionSetEvent.Set();
+		}
 
-        public void CancelUpdateApp()
-        {
-            if (_updateAppCancellationTokenSource != null)
-            {
-                DebugLogger.Log("Cancelling update app execution.");
+		public void CancelUpdateApp()
+		{
+			if (_updateAppCancellationTokenSource != null)
+			{
+				DebugLogger.Log("Cancelling update app execution.");
 
-                _updateAppCancellationTokenSource.Cancel();
-            }
-        }
+				_updateAppCancellationTokenSource.Cancel();
+			}
+		}
 
-        public void Quit()
-        {
-            DebugLogger.Log("Quitting application.");
+		public void Quit()
+		{
+			DebugLogger.Log("Quitting application.");
+			_canStartThread = false;
+
+			if (!LauncherRelay.IsDoneSendingData)
+				return;
 
 #if UNITY_EDITOR
-            if (Application.isEditor)
-            {
-                UnityEditor.EditorApplication.isPlaying = false;
-            }
-            else
+			if (Application.isEditor)
+			{
+				UnityEditor.EditorApplication.isPlaying = false;
+			}
+			else
 #endif
-            {
-                Application.Quit();
-            }
-        }
+			{
+				Application.Quit();
+			}
+		}
 
-        private void CloseLockFile()
-        {
-            try
-            {
-                if (_lockFileStream != null)
-                {
-                    _lockFileStream.Close();
+		private void CloseLockFile()
+		{
+			try
+			{
+				if (_lockFileStream != null)
+				{
+					_lockFileStream.Close();
 
-                    DebugLogger.Log("Deleting the lock file.");
-                    if (File.Exists(_data.Value.LockFilePath))
-                    {
-                        FileOperations.Delete(_data.Value.LockFilePath, CancellationToken.Empty);
-                    }
-                }
-            }
-            catch(Exception e)
-            {
-                DebugLogger.LogWarning("Lock file closing error - " + e);
-            }
-        }
+					DebugLogger.Log("Deleting the lock file.");
+					if (File.Exists(_data.Value.LockFilePath))
+					{
+						FileOperations.Delete(_data.Value.LockFilePath, CancellationToken.Empty);
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				DebugLogger.LogWarning("Lock file closing error - " + e);
+			}
+		}
 
-        private void Awake()
-        {
-            UnityEngine.Assertions.Assert.raiseExceptions = true;
+		private void Awake()
+		{
+			UnityEngine.Assertions.Assert.raiseExceptions = true;
 
-            Assert.IsNull(_instance, "There must be only one instance of Patcher component.");
-            Assert.IsNotNull(ErrorDialog, "ErrorDialog must be set.");
+			//Assert.IsNull(_instance, "There must be only one instance of Patcher component.");
+			Assert.IsNotNull(ErrorDialog, "ErrorDialog must be set.");
 
-            _instance = this;
-            UnityDispatcher.Initialize();
-            Application.runInBackground = true;
+			_instance = this;
+			UnityDispatcher.Initialize();
+			Application.runInBackground = true;
 
-            DebugLogger.LogFormat("patchkit-patcher-unity: {0}", Version.Value);
-            DebugLogger.LogFormat("System version: {0}", EnvironmentInfo.GetSystemVersion());
-            DebugLogger.LogFormat("Runtime version: {0}", EnvironmentInfo.GetSystemVersion());
+			DebugLogger.LogFormat("patchkit-patcher-unity: {0}", Version.Value);
+			DebugLogger.LogFormat("System version: {0}", EnvironmentInfo.GetSystemVersion());
+			DebugLogger.LogFormat("Runtime version: {0}", EnvironmentInfo.GetSystemVersion());
 
-            CheckEditorAppSecretSecure();
+			CheckEditorAppSecretSecure();
 
-            if (_canStartThread)
-            {
-                StartThread();
-            }
-        }
+			if (_canStartThread)
+			{
+				StartThread();
+			}
+		}
 
-        /// <summary>
-        /// During patcher testing somebody may replace the secret with real game secret. If that would happen,
-        /// patcher should quit immediatelly with following error.
-        /// </summary>
-        private void CheckEditorAppSecretSecure()
-        {
-            if (!Application.isEditor)
-            {
-                if (!string.IsNullOrEmpty(EditorAppSecret) && EditorAppSecret.Trim() != EditorAllowedSecret)
-                {
-                    DebugLogger.LogError("Security issue: EditorAppSecret is set to not allowed value. " +
-                                         "Please change it inside Unity editor to " + EditorAllowedSecret +
-                                         " and build the project again.");
-                    Quit();
-                }
-            }
-        }
+		/// <summary>
+		/// During patcher testing somebody may replace the secret with real game secret. If that would happen,
+		/// patcher should quit immediatelly with following error.
+		/// </summary>
+		private void CheckEditorAppSecretSecure()
+		{
+			if (!Application.isEditor)
+			{
+				if (!string.IsNullOrEmpty(EditorAppSecret) && EditorAppSecret.Trim() != EditorAllowedSecret)
+				{
+					DebugLogger.LogError("Security issue: EditorAppSecret is set to not allowed value. " +
+										 "Please change it inside Unity editor to " + EditorAllowedSecret +
+										 " and build the project again.");
+					Quit();
+				}
+			}
+		}
 
-        private void Update()
-        {
-            if (_thread == null || !_thread.IsAlive)
-            {
-                DebugLogger.Log("Quitting application because patcher thread is not alive.");
-                Quit();
-            }
-        }
+		private void Update()
+		{
+			if (_thread == null || !_thread.IsAlive)
+			{
+				DebugLogger.Log("Quitting application because patcher thread is not alive.");
+				Quit();
+			}
+		}
 
-        private void OnApplicationQuit()
-        {
-            Application.CancelQuit();
-            StartCoroutine(ForceQuit());
-        }
+		private void OnApplicationQuit()
+		{
+			Application.CancelQuit();
+			StartCoroutine(ForceQuit());
+		}
 
-        private IEnumerator ForceQuit()
-        {
-            if (_isForceQuitting)
-            {
-                yield break;
-            }
+		private IEnumerator ForceQuit()
+		{
+			if (_isForceQuitting)
+			{
+				yield break;
+			}
 
-            _isForceQuitting = true;
+			_isForceQuitting = true;
 
-            try
-            {
-                _canStartThread = false;
+			try
+			{
+				_canStartThread = false;
 
-                CloseLockFile();
+				CloseLockFile();
 
-                yield return StartCoroutine(KillThread());
+				yield return StartCoroutine(KillThread());
 
-                if (_wasUpdateSuccessfulOrNotNecessary && !_hasGameBeenStarted)
-                {
-                    yield return StartCoroutine(PatcherStatistics.SendEvent(PatcherStatistics.Event.PatcherSucceededClosed));
-                }
+				if (_wasUpdateSuccessfulOrNotNecessary && !_hasGameBeenStarted)
+				{
+					yield return StartCoroutine(PatcherStatistics.SendEvent(PatcherStatistics.Event.PatcherSucceededClosed));
+				}
 
-                if (!Application.isEditor)
-                {
-                    Process.GetCurrentProcess().Kill();
-                }
-            }
-            finally
-            {
-                _isForceQuitting = false;
-            }
-        }
+				if (!Application.isEditor)
+				{
+					Process.GetCurrentProcess().Kill();
+				}
+			}
+			finally
+			{
+				_isForceQuitting = false;
+			}
+		}
 
-        private IEnumerator KillThread()
-        {
-            if (_thread == null)
-            {
-                yield break;
-            }
+		private IEnumerator KillThread()
+		{
+			if (_thread == null)
+			{
+				yield break;
+			}
 
-            while (_thread.IsAlive)
-            {
-                CancelThread();
+			while (_thread.IsAlive)
+			{
+				CancelThread();
 
-                float startWaitTime = Time.unscaledTime;
-                while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
-                {
-                    yield return null;
-                }
+				float startWaitTime = Time.unscaledTime;
+				while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
+				{
+					yield return null;
+				}
 
-                if (!_thread.IsAlive)
-                {
-                    break;
-                }
+				if (!_thread.IsAlive)
+				{
+					break;
+				}
 
-                InterruptThread();
+				InterruptThread();
 
-                startWaitTime = Time.unscaledTime;
-                while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
-                {
-                    yield return null;
-                }
+				startWaitTime = Time.unscaledTime;
+				while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
+				{
+					yield return null;
+				}
 
-                if (!_thread.IsAlive)
-                {
-                    break;
-                }
+				if (!_thread.IsAlive)
+				{
+					break;
+				}
 
-                AbortThread();
+				AbortThread();
 
-                startWaitTime = Time.unscaledTime;
-                while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
-                {
-                    yield return null;
-                }
-            }
+				startWaitTime = Time.unscaledTime;
+				while (Time.unscaledTime - startWaitTime < 1.0f && _thread.IsAlive)
+				{
+					yield return null;
+				}
+			}
 
-            _thread = null;
-        }
+			_thread = null;
+		}
 
-        private void StartThread()
-        {
-            DebugLogger.Log("Starting patcher thread...");
+		private void StartThread()
+		{
+			DebugLogger.Log("Starting patcher thread...");
 
-            _thread = new Thread(() => ThreadExecution(_threadCancellationTokenSource.Token))
-            {
-                IsBackground = true
-            };
-            _thread.Start();
-        }
+			_thread = new Thread(() => ThreadExecution(_threadCancellationTokenSource.Token))
+			{
+				IsBackground = true
+			};
+			_thread.Start();
+		}
 
-        private void CancelThread()
-        {
-            DebugLogger.Log("Cancelling patcher thread...");
+		private void CancelThread()
+		{
+			DebugLogger.Log("Cancelling patcher thread...");
 
-            _threadCancellationTokenSource.Cancel();
-        }
+			_threadCancellationTokenSource.Cancel();
+		}
 
-        private void InterruptThread()
-        {
-            DebugLogger.Log("Interrupting patcher thread...");
+		private void InterruptThread()
+		{
+			DebugLogger.Log("Interrupting patcher thread...");
 
-            _thread.Interrupt();
-        }
+			_thread.Interrupt();
+		}
 
-        private void AbortThread()
-        {
-            DebugLogger.Log("Aborting patcher thread...");
+		private void AbortThread()
+		{
+			DebugLogger.Log("Aborting patcher thread...");
 
-            _thread.Abort();
-        }
+			_thread.Abort();
+		}
 
-        private void ThreadExecution(CancellationToken cancellationToken)
-        {
-            try
-            {
-                _state.Value = PatcherState.None;
+		private void ThreadExecution(CancellationToken cancellationToken)
+		{
+			try
+			{
+				_state.Value = PatcherState.None;
 
-                DebugLogger.Log("Patcher thread started.");
+				DebugLogger.Log("Patcher thread started.");
 
-                try
-                {
-                    ThreadLoadPatcherData();
-                }
-                catch (NonLauncherExecutionException)
-                {
-                    try
-                    {
-                        LauncherUtilities.ExecuteLauncher();
-                        return;
-                    }
-                    catch (ApplicationException)
-                    {
-                        ThreadDisplayError(PatcherError.NonLauncherExecution(), cancellationToken);
-                        return;
-                    }
-                    finally
-                    {
-                        Quit();
-                    }
-                }
+				try
+				{
+					ThreadLoadPatcherData();
+				}
+				catch (NonLauncherExecutionException)
+				{
+					try
+					{
+						LauncherUtilities.ExecuteLauncher();
+						return;
+					}
+					catch (ApplicationException)
+					{
+						ThreadDisplayError(PatcherErrorMessage.NonLauncherExecution(), cancellationToken);
+						return;
+					}
+					finally
+					{
+						Quit();
+					}
+				}
 
-                EnsureSingleInstance();
+				EnsureSingleInstance();
 
-                ThreadLoadPatcherConfiguration();
+				ThreadLoadPatcherConfiguration();
 
-                UnityDispatcher.Invoke(() => _app = new App(_data.Value.AppDataPath, _data.Value.AppSecret, _data.Value.OverrideLatestVersionId, _requestTimeoutCalculator)).WaitOne();
+				UnityDispatcher.Invoke(() => _app = new App(_data.Value.AppDataPath, _data.Value.AppSecret, _data.Value.OverrideLatestVersionId, _requestTimeoutCalculator)).WaitOne();
 
-                PatcherStatistics.TryDispatchSendEvent(PatcherStatistics.Event.PatcherStarted);
+				PatcherStatistics.TryDispatchSendEvent(PatcherStatistics.Event.PatcherStarted);
 
-                while (true)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
+				while (true)
+				{
+					cancellationToken.ThrowIfCancellationRequested();
 
-                    ThreadWaitForUserDecision(cancellationToken);
+					ThreadWaitForUserDecision(cancellationToken);
 
-                    cancellationToken.ThrowIfCancellationRequested();
+					cancellationToken.ThrowIfCancellationRequested();
 
-                    ThreadExecuteUserDecision(cancellationToken);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                DebugLogger.Log("Patcher thread finished: thread has been cancelled.");
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log("Patcher thread finished: thread has been interrupted.");
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log("Patcher thread finished: thread has been aborted.");
-            }
-            catch (MultipleInstancesException exception)
-            {
-                DebugLogger.LogException(exception);
-                Quit();
-            }
-            catch (Exception exception)
-            {
-                DebugLogger.LogError("Patcher thread failed: an exception has occured.");
-                DebugLogger.LogException(exception);
-            }
-            finally
-            {
-                _state.Value = PatcherState.None;
-            }
-        }
+					ThreadExecuteUserDecision(cancellationToken);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				DebugLogger.Log("Patcher thread finished: thread has been cancelled.");
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log("Patcher thread finished: thread has been interrupted.");
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log("Patcher thread finished: thread has been aborted.");
+			}
+			catch (MultipleInstancesException exception)
+			{
+				DebugLogger.LogException(exception);
+				Quit();
+			}
+			catch (Exception exception)
+			{
+				DebugLogger.LogError("Patcher thread failed: an exception has occured.");
+				DebugLogger.LogException(exception);
+			}
+			finally
+			{
+				_state.Value = PatcherState.None;
+			}
+		}
 
-        private void ThreadLoadPatcherData()
-        {
-            try
-            {
-                DebugLogger.Log("Loading patcher data...");
-                _state.Value = PatcherState.LoadingPatcherData;
+		private void ThreadLoadPatcherData()
+		{
+			try
+			{
+				DebugLogger.Log("Loading patcher data...");
+				_state.Value = PatcherState.LoadingPatcherData;
 
 #if UNITY_EDITOR
-                UnityDispatcher.Invoke(() =>
-                {
-                    DebugLogger.Log("Using Unity Editor patcher data.");
-                    _data.Value = new PatcherData
-                    {
-                        AppSecret = EditorAppSecret,
-                        AppDataPath =
-                            Application.dataPath.Replace("/Assets",
-                                string.Format("/Temp/PatcherApp{0}", EditorAppSecret)),
-                        OverrideLatestVersionId = EditorOverrideLatestVersionId,
-                        IsOnline = null
-                    };
-                }).WaitOne();
+				UnityDispatcher.Invoke(() =>
+				{
+					DebugLogger.Log("Using Unity Editor patcher data.");
+					_data.Value = new PatcherData
+					{
+						AppSecret = EditorAppSecret,
+						AppDataPath =
+							Application.dataPath.Replace("/Assets",
+								string.Format("/Temp/PatcherApp{0}", EditorAppSecret)),
+						OverrideLatestVersionId = EditorOverrideLatestVersionId,
+						IsOnline = null
+					};
+				}).WaitOne();
 #else
                 DebugLogger.Log("Using command line patcher data reader.");
                 var inputArgumentsPatcherDataReader = new InputArgumentsPatcherDataReader();
                 _data.Value = inputArgumentsPatcherDataReader.Read();
 #endif
-                DebugLogger.LogVariable(_data.Value.AppSecret, "Data.AppSecret");
-                DebugLogger.LogVariable(_data.Value.AppDataPath, "Data.AppDataPath");
-                DebugLogger.LogVariable(_data.Value.OverrideLatestVersionId, "Data.OverrideLatestVersionId");
-                DebugLogger.LogVariable(_data.Value.LockFilePath, "Data.LockFilePath");
-                DebugLogger.LogVariable(_data.Value.IsOnline, "Data.IsOnline");
+				DebugLogger.LogVariable(_data.Value.AppSecret, "Data.AppSecret");
+				DebugLogger.LogVariable(_data.Value.AppDataPath, "Data.AppDataPath");
+				DebugLogger.LogVariable(_data.Value.OverrideLatestVersionId, "Data.OverrideLatestVersionId");
+				DebugLogger.LogVariable(_data.Value.LockFilePath, "Data.LockFilePath");
+				DebugLogger.LogVariable(_data.Value.IsOnline, "Data.IsOnline");
 
 
-                if (_data.Value.IsOnline.HasValue &&
-                    !_data.Value.IsOnline.Value)
-                {
-                    DebugLogger.Log("Disabling auto-updating because patcher is in offline mode.");
+				if (_data.Value.IsOnline.HasValue &&
+					!_data.Value.IsOnline.Value)
+				{
+					DebugLogger.Log("Disabling auto-updating because patcher is in offline mode.");
 
-                    _hasAutomaticallyInstalledApp = true;
-                    _hasAutomaticallyCheckedForAppUpdate = true;
+					_hasAutomaticallyInstalledApp = true;
+					_hasAutomaticallyCheckedForAppUpdate = true;
 
-                    _warning.Value = "Working in offline mode";
-                }
+					_warning.Value = "Working in offline mode";
+				}
 
-                DebugLogger.Log("Patcher data loaded.");
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log("Loading patcher data interrupted: thread has been interrupted. Rethrowing exception.");
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log("Loading patcher data aborted: thread has been aborted. Rethrowing exception.");
-                throw;
-            }
-            catch (Exception)
-            {
-                DebugLogger.LogError("Error while loading patcher data: an exception has occured. Rethrowing exception.");
-                throw;
-            }
-        }
+				DebugLogger.Log("Patcher data loaded.");
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log("Loading patcher data interrupted: thread has been interrupted. Rethrowing exception.");
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log("Loading patcher data aborted: thread has been aborted. Rethrowing exception.");
+				throw;
+			}
+			catch (Exception)
+			{
+				DebugLogger.LogError("Error while loading patcher data: an exception has occured. Rethrowing exception.");
+				throw;
+			}
+		}
 
-        private void EnsureSingleInstance()
-        {
-            string lockFilePath = Data.Value.LockFilePath;
-            DebugLogger.LogFormat("Opening lock file: {0}", lockFilePath);
+		private void EnsureSingleInstance()
+		{
+			string lockFilePath = Data.Value.LockFilePath;
+			DebugLogger.LogFormat("Opening lock file: {0}", lockFilePath);
 
-            if (!string.IsNullOrEmpty(lockFilePath))
-            {
-                try
-                {
-                    _lockFileStream = File.Open(lockFilePath, FileMode.Append);
-                    DebugLogger.Log("Lock file open success");
-                }
-                catch
-                {
-                    throw new MultipleInstancesException("Another instance of Patcher spotted");
-                }
-            }
-            else
-            {
-                DebugLogger.LogWarning("LockFile is missing");
-            }
-        }
+			if (!string.IsNullOrEmpty(lockFilePath))
+			{
+				try
+				{
+					_lockFileStream = File.Open(lockFilePath, FileMode.Append);
+					DebugLogger.Log("Lock file open success");
+				}
+				catch
+				{
+					throw new MultipleInstancesException("Another instance of Patcher spotted");
+				}
+			}
+			else
+			{
+				DebugLogger.LogWarning("LockFile is missing");
+			}
+		}
 
-        private void ThreadLoadPatcherConfiguration()
-        {
-            try
-            {
-                DebugLogger.Log("Loading patcher configuration...");
+		private void ThreadLoadPatcherConfiguration()
+		{
+			try
+			{
+				DebugLogger.Log("Loading patcher configuration...");
 
-                _state.Value = PatcherState.LoadingPatcherConfiguration;
+				_state.Value = PatcherState.LoadingPatcherConfiguration;
 
-                // TODO: Use PatcherConfigurationReader
-                _configuration = DefaultConfiguration;
+				// TODO: Use PatcherConfigurationReader
+				_configuration = DefaultConfiguration;
 
-                DebugLogger.Log("Patcher configuration loaded.");
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log("Loading patcher configuration interrupted: thread has been interrupted. Rethrowing exception.");
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log("Loading patcher configuration aborted: thread has been aborted. Rethrowing exception.");
-                throw;
-            }
-            catch (Exception)
-            {
-                DebugLogger.LogError("Error while loading patcher configuration: an exception has occured. Rethrowing exception.");
-                throw;
-            }
-        }
+				DebugLogger.Log("Patcher configuration loaded.");
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log("Loading patcher configuration interrupted: thread has been interrupted. Rethrowing exception.");
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log("Loading patcher configuration aborted: thread has been aborted. Rethrowing exception.");
+				throw;
+			}
+			catch (Exception)
+			{
+				DebugLogger.LogError("Error while loading patcher configuration: an exception has occured. Rethrowing exception.");
+				throw;
+			}
+		}
 
-        private void ThreadWaitForUserDecision(CancellationToken cancellationToken)
-        {
-            try
-            {
-                DebugLogger.Log("Waiting for user decision...");
+		private void ThreadWaitForUserDecision(CancellationToken cancellationToken)
+		{
+			try
+			{
+				DebugLogger.Log("Waiting for user decision...");
 
-                _state.Value = PatcherState.WaitingForUserDecision;
+				_state.Value = PatcherState.WaitingForUserDecision;
 
-                bool isInstalled = _app.IsFullyInstalled();
+				bool isInstalled = _app.IsFullyInstalled();
 
-                DebugLogger.LogVariable(isInstalled, "isInstalled");
+				DebugLogger.LogVariable(isInstalled, "isInstalled");
 
-                bool canRepairApp = false; // not implemented
-                bool canInstallApp = !isInstalled;
-                bool canCheckForAppUpdates = isInstalled;
-                bool canStartApp = isInstalled;
+				bool canRepairApp = false; // not implemented
+				bool canInstallApp = !isInstalled;
+				bool canCheckForAppUpdates = isInstalled;
+				bool canStartApp = isInstalled;
 
-                _isAppInstalled.Value = isInstalled;
+				_isAppInstalled.Value = isInstalled;
 
-                _canRepairApp.Value = false;
-                _canInstallApp.Value = false;
-                _canCheckForAppUpdates.Value = false;
-                _canStartApp.Value = false;
+				_canRepairApp.Value = false;
+				_canInstallApp.Value = false;
+				_canCheckForAppUpdates.Value = false;
+				_canStartApp.Value = false;
 
-                if (canInstallApp && _configuration.AutomaticallyInstallApp && !_hasAutomaticallyInstalledApp)
-                {
-                    DebugLogger.Log("Automatically deciding to install app.");
-                    _hasAutomaticallyInstalledApp = true;
-                    _hasAutomaticallyCheckedForAppUpdate = true;
-                    _userDecision = UserDecision.InstallAppAutomatically;
-                    return;
-                }
+				if (canInstallApp && _configuration.AutomaticallyInstallApp && !_hasAutomaticallyInstalledApp)
+				{
+					DebugLogger.Log("Automatically deciding to install app.");
+					_hasAutomaticallyInstalledApp = true;
+					_hasAutomaticallyCheckedForAppUpdate = true;
+					_userDecision = UserDecision.InstallAppAutomatically;
+					return;
+				}
 
-                if (canCheckForAppUpdates && _configuration.AutomaticallyCheckForAppUpdates &&
-                    !_hasAutomaticallyCheckedForAppUpdate)
-                {
-                    DebugLogger.Log("Automatically deciding to check for app updates.");
-                    _hasAutomaticallyInstalledApp = true;
-                    _hasAutomaticallyCheckedForAppUpdate = true;
-                    _userDecision = UserDecision.CheckForAppUpdatesAutomatically;
-                    return;
-                }
+				if (canCheckForAppUpdates && _configuration.AutomaticallyCheckForAppUpdates &&
+					!_hasAutomaticallyCheckedForAppUpdate)
+				{
+					DebugLogger.Log("Automatically deciding to check for app updates.");
+					_hasAutomaticallyInstalledApp = true;
+					_hasAutomaticallyCheckedForAppUpdate = true;
+					_userDecision = UserDecision.CheckForAppUpdatesAutomatically;
+					return;
+				}
 
-                if (canStartApp && _configuration.AutomaticallyStartApp && !_hasAutomaticallyStartedApp)
-                {
-                    DebugLogger.Log("Automatically deciding to start app.");
-                    _hasAutomaticallyStartedApp = true;
-                    _userDecision = UserDecision.StartAppAutomatically;
-                    return;
-                }
+				var updatesOnly = Environment.GetCommandLineArgs().Any(arg => arg.Equals("--updateOnly", StringComparison.OrdinalIgnoreCase));
+				if (canStartApp && updatesOnly)
+				{
+					_canStartApp.Value = true;
+					_userDecision = UserDecision.AppUpdatesOnly;
+					return;
+				}
+				else
+				{
 
-                _canRepairApp.Value = canRepairApp;
-                _canInstallApp.Value = canInstallApp;
-                _canCheckForAppUpdates.Value = canCheckForAppUpdates;
-                _canStartApp.Value = canStartApp;
+					if (canStartApp && _configuration.AutomaticallyStartApp && !_hasAutomaticallyStartedApp)
+					{
+						DebugLogger.Log("Automatically deciding to start app.");
+						_hasAutomaticallyStartedApp = true;
+						_userDecision = UserDecision.StartAppAutomatically;
+						return;
+					}
 
-                _userDecisionSetEvent.Reset();
-                using (cancellationToken.Register(() => _userDecisionSetEvent.Set()))
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    _userDecisionSetEvent.WaitOne();
-                }
+					_canRepairApp.Value = canRepairApp;
+					_canInstallApp.Value = canInstallApp;
+					_canCheckForAppUpdates.Value = canCheckForAppUpdates;
+					_canStartApp.Value = canStartApp;
 
-                _canRepairApp.Value = false;
-                _canInstallApp.Value = false;
-                _canCheckForAppUpdates.Value = false;
-                _canStartApp.Value = false;
+				}
+				_userDecisionSetEvent.Reset();
+				using (cancellationToken.Register(() => _userDecisionSetEvent.Set()))
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					_userDecisionSetEvent.WaitOne();
+				}
 
-                cancellationToken.ThrowIfCancellationRequested();
+				_canRepairApp.Value = false;
+				_canInstallApp.Value = false;
+				_canCheckForAppUpdates.Value = false;
+				_canStartApp.Value = false;
 
-                DebugLogger.Log(string.Format("Waiting for user decision result: {0}.", _userDecision));
-            }
-            catch (OperationCanceledException)
-            {
-                DebugLogger.Log("Waiting for user decision cancelled.");
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log("Waiting for user decision interrupted: thread has been interrupted. Rethrowing exception.");
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log("Waiting for user decision aborted: thread has been aborted. Rethrowing exception.");
-                throw;
-            }
-            catch (Exception)
-            {
-                DebugLogger.LogWarning("Error while waiting for user decision: an exception has occured. Rethrowing exception.");
-                throw;
-            }
-        }
+				cancellationToken.ThrowIfCancellationRequested();
 
-        private void ThreadExecuteUserDecision(CancellationToken cancellationToken)
-        {
-            bool displayWarningInsteadOfError = false;
+				DebugLogger.Log(string.Format("Waiting for user decision result: {0}.", _userDecision));
+			}
+			catch (OperationCanceledException)
+			{
+				DebugLogger.Log("Waiting for user decision cancelled.");
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log("Waiting for user decision interrupted: thread has been interrupted. Rethrowing exception.");
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log("Waiting for user decision aborted: thread has been aborted. Rethrowing exception.");
+				throw;
+			}
+			catch (Exception)
+			{
+				DebugLogger.LogWarning("Error while waiting for user decision: an exception has occured. Rethrowing exception.");
+				throw;
+			}
+		}
 
-            try
-            {
-                _warning.Value = string.Empty;
+		private void ThreadExecuteUserDecision(CancellationToken cancellationToken)
+		{
+			bool displayWarningInsteadOfError = false;
 
-                DebugLogger.Log(string.Format("Executing user decision {0}...", _userDecision));
+			try
+			{
+				_warning.Value = string.Empty;
 
-                switch (_userDecision)
-                {
-                    case UserDecision.None:
-                        break;
-                    case UserDecision.RepairApp:
-                        break;
-                    case UserDecision.StartAppAutomatically:
-                    case UserDecision.StartApp:
-                        ThreadStartApp();
-                        break;
-                    case UserDecision.InstallAppAutomatically:
-                        displayWarningInsteadOfError = _app.IsFullyInstalled();
-                        ThreadUpdateApp(true, cancellationToken);
-                        break;
-                    case UserDecision.InstallApp:
-                        ThreadUpdateApp(false, cancellationToken);
-                        break;
-                    case UserDecision.CheckForAppUpdatesAutomatically:
-                        displayWarningInsteadOfError = _app.IsFullyInstalled();
-                        ThreadUpdateApp(true, cancellationToken);
-                        break;
-                    case UserDecision.CheckForAppUpdates:
-                        ThreadUpdateApp(false, cancellationToken);
-                        break;
-                }
+				DebugLogger.Log(string.Format("Executing user decision {0}...", _userDecision));
 
-                DebugLogger.Log(string.Format("User decision {0} execution done.", _userDecision));
-            }
-            catch (OperationCanceledException)
-            {
-                DebugLogger.Log(string.Format("User decision {0} execution cancelled.", _userDecision));
-            }
-            catch (UnauthorizedAccessException e)
-            {
-                DebugLogger.Log(string.Format("User decision {0} execution issue: permissions failure.",
-                    _userDecision));
-                DebugLogger.LogException(e);
+				switch (_userDecision)
+				{
+					case UserDecision.None:
+						break;
+					case UserDecision.RepairApp:
+						break;
+					case UserDecision.StartAppAutomatically:
+					case UserDecision.StartApp:
+						ThreadStartApp();
+						break;
+					case UserDecision.InstallAppAutomatically:
+						displayWarningInsteadOfError = _app.IsFullyInstalled();
+						ThreadUpdateApp(true, cancellationToken);
+						break;
+					case UserDecision.InstallApp:
+						ThreadUpdateApp(false, cancellationToken);
+						break;
+					case UserDecision.CheckForAppUpdatesAutomatically:
+						displayWarningInsteadOfError = _app.IsFullyInstalled();
+						ThreadUpdateApp(true, cancellationToken);
+						break;
+					case UserDecision.CheckForAppUpdates:
+						ThreadUpdateApp(false, cancellationToken);
+						break;
+				}
 
-                if (ThreadTryRestartWithRequestForPermissions())
-                {
-                    UnityDispatcher.Invoke(Quit);
-                }
-                else
-                {
-                    ThreadDisplayError(PatcherError.NoPermissions(), cancellationToken);
-                }
-            }
-            catch (ApiConnectionException e)
-            {
-                DebugLogger.LogException(e);
+				DebugLogger.Log(string.Format("User decision {0} execution done.", _userDecision));
+			}
+			catch (OperationCanceledException)
+			{
+				DebugLogger.Log(string.Format("User decision {0} execution cancelled.", _userDecision));
+			}
+			catch (UnauthorizedAccessException e)
+			{
+				DebugLogger.Log(string.Format("User decision {0} execution issue: permissions failure.",
+					_userDecision));
+				DebugLogger.LogException(e);
 
-                if (displayWarningInsteadOfError)
-                {
-                    _warning.Value = "Unable to check for updates. Please check your internet connection.";
-                }
-                else
-                {
-                    ThreadDisplayError(PatcherError.NoInternetConnection(), cancellationToken);
-                }
-            }
-            catch (NotEnoughtDiskSpaceException e)
-            {
-                DebugLogger.LogException(e);
-                ThreadDisplayError(PatcherError.NotEnoughDiskSpace(e.RequiredSpace - e.AvailableSpace), cancellationToken);
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log(string.Format(
-                    "User decision {0} execution interrupted: thread has been interrupted. Rethrowing exception.",
-                    _userDecision));
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log(string.Format(
-                    "User decision {0} execution aborted: thread has been aborted. Rethrowing exception.",
-                    _userDecision));
-                throw;
-            }
-            catch (Exception exception)
-            {
-                DebugLogger.LogWarning(string.Format(
-                    "Error while executing user decision {0}: an exception has occured.", _userDecision));
-                DebugLogger.LogException(exception);
+				if (ThreadTryRestartWithRequestForPermissions())
+				{
+					UnityDispatcher.Invoke(Quit);
+				}
+				else
+				{
+					ThreadDisplayError(PatcherErrorMessage.NoPermissions(), cancellationToken);
+				}
+			}
+			catch (ApiConnectionException e)
+			{
+				DebugLogger.LogException(e);
 
-                if (displayWarningInsteadOfError)
-                {
-                    _warning.Value = "Unable to check for updates. Please check your internet connection.";
-                }
-                else
-                {
-                    ThreadDisplayError(PatcherError.Other(), cancellationToken);
-                }
-            }
-        }
+				if (displayWarningInsteadOfError)
+				{
+					_warning.Value = "Unable to check for updates. Please check your internet connection.";
+				}
+				else
+				{
+					ThreadDisplayError(PatcherErrorMessage.NoInternetConnection(), cancellationToken);
+				}
+			}
+			catch (NotEnoughtDiskSpaceException e)
+			{
+				DebugLogger.LogException(e);
+				ThreadDisplayError(PatcherErrorMessage.NotEnoughDiskSpace(e.RequiredSpace - e.AvailableSpace), cancellationToken);
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log(string.Format(
+					"User decision {0} execution interrupted: thread has been interrupted. Rethrowing exception.",
+					_userDecision));
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log(string.Format(
+					"User decision {0} execution aborted: thread has been aborted. Rethrowing exception.",
+					_userDecision));
+				throw;
+			}
+			catch (Exception exception)
+			{
+				DebugLogger.LogWarning(string.Format(
+					"Error while executing user decision {0}: an exception has occured.", _userDecision));
+				DebugLogger.LogException(exception);
 
-        private void ThreadDisplayError(PatcherError error, CancellationToken cancellationToken)
-        {
-            PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherFailed);
-            
-            try
-            {
-                _state.Value = PatcherState.DisplayingError;
+				if (displayWarningInsteadOfError)
+				{
+					_warning.Value = "Unable to check for updates. Please check your internet connection.";
+				}
+				else
+				{
+					ThreadDisplayError(PatcherErrorMessage.Other(), cancellationToken);
+				}
+			}
+		}
 
-                DebugLogger.Log(string.Format("Displaying patcher error {0}...", error));
+		private void ThreadDisplayError(PatcherErrorMessage error, CancellationToken cancellationToken)
+		{
+			PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherFailed);
 
-                ErrorDialog.Display(error, cancellationToken);
+			try
+			{
+				_state.Value = PatcherState.DisplayingError;
 
-                DebugLogger.Log(string.Format("Patcher error {0} displayed.", error));
-            }
-            catch (OperationCanceledException)
-            {
-                DebugLogger.Log(string.Format("Displaying patcher error {0} cancelled.", _userDecision));
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log(string.Format("Displaying patcher error {0} interrupted: thread has been interrupted. Rethrowing exception.", error));
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log(string.Format("Displaying patcher error {0} aborted: thread has been aborted. Rethrowing exception.", error));
-                throw;
-            }
-            catch (Exception)
-            {
-                DebugLogger.LogWarning(string.Format("Error while displaying patcher error {0}: an exception has occured. Rethrowing exception.", error));
-                throw;
-            }
-        }
+				DebugLogger.Log($"Displaying patcher error {error.Message}...");
 
-        private void ThreadStartApp()
-        {
-            _state.Value = PatcherState.StartingApp;
+				ErrorDialog.Display(error, cancellationToken);
 
-            var appStarter = new AppStarter(_app);
+				DebugLogger.Log($"Patcher error {error.Message} displayed.");
+			}
+			catch (OperationCanceledException)
+			{
+				DebugLogger.Log($"Displaying patcher error {_userDecision} cancelled.");
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log($"Displaying patcher error {error.Message} interrupted: thread has been interrupted. Rethrowing exception.");
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log($"Displaying patcher error {error.Message} aborted: thread has been aborted. Rethrowing exception.");
+				throw;
+			}
+			catch (Exception)
+			{
+				DebugLogger.LogWarning($"Error while displaying patcher error {error.Message}: an exception has occured. Rethrowing exception.");
+				throw;
+			}
+		}
 
-            appStarter.Start();
+		private void ThreadStartApp()
+		{
+			_state.Value = PatcherState.StartingApp;
 
-            PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherSucceededGameStarted);
-            _hasGameBeenStarted = true;
+			var appStarter = new AppStarter(_app);
 
-            UnityDispatcher.Invoke(Quit);
-        }
+			appStarter.Start();
 
-        private void ThreadUpdateApp(bool automatically, CancellationToken cancellationToken)
-        {
-            _state.Value = PatcherState.Connecting;
+			PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherSucceededGameStarted);
+			_hasGameBeenStarted = true;
 
-            _updateAppCancellationTokenSource = new PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource();
+			UnityDispatcher.Invoke(Quit);
+		}
 
-            using (cancellationToken.Register(() => _updateAppCancellationTokenSource.Cancel()))
-            {
-                _appInfo.Value = _app.RemoteMetaData.GetAppInfo(!automatically, _updateAppCancellationTokenSource.Token);
-                _remoteVersionId.Value = _app.GetLatestVersionId(!automatically, _updateAppCancellationTokenSource.Token);
-                if (_app.IsFullyInstalled())
-                {
-                    _localVersionId.Value = _app.GetInstalledVersionId();
-                }
+		private void ThreadUpdateApp(bool automatically, CancellationToken cancellationToken)
+		{
+			_state.Value = PatcherState.Connecting;
 
-                var appUpdater = new AppUpdater.AppUpdater( new AppUpdaterContext( _app, _configuration.AppUpdaterConfiguration ) );
+			_updateAppCancellationTokenSource = new PatchKit.Unity.Patcher.Cancellation.CancellationTokenSource();
 
-                try
-                {
-                    _updaterStatus.Value = appUpdater.Status;
+			using (cancellationToken.Register(() => _updateAppCancellationTokenSource.Cancel()))
+			{
+				_appInfo.Value = _app.RemoteMetaData.GetAppInfo(!automatically, _updateAppCancellationTokenSource.Token);
+				_remoteVersionId.Value = _app.GetLatestVersionId(!automatically, _updateAppCancellationTokenSource.Token);
+				if (_app.IsFullyInstalled())
+				{
+					_localVersionId.Value = _app.GetInstalledVersionId();
+				}
 
-                    using (_updaterStatus.Take(1).Subscribe((status) => _state.Value = PatcherState.UpdatingApp))
-                    {
-                        appUpdater.Update(_updateAppCancellationTokenSource.Token);
-                        _wasUpdateSuccessfulOrNotNecessary = true;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherCanceled);
+				var appUpdater = new AppUpdater.AppUpdater(new AppUpdaterContext(_app, _configuration.AppUpdaterConfiguration));
 
-                    throw;
-                }
-                finally
-                {
-                    _state.Value = PatcherState.None;
+				try
+				{
+					_updaterStatus.Value = appUpdater.Status;
 
-                    _updaterStatus.Value = null;
-                    _updateAppCancellationTokenSource = null;
-                }
-            }
-        }
+					using (_updaterStatus.Take(1).Subscribe((status) => _state.Value = PatcherState.UpdatingApp))
+					{
+						appUpdater.Update(_updateAppCancellationTokenSource.Token);
+						_wasUpdateSuccessfulOrNotNecessary = true;
+					}
+				}
+				catch (OperationCanceledException)
+				{
+					PatcherStatistics.DispatchSendEvent(PatcherStatistics.Event.PatcherCanceled);
 
-        private bool ThreadTryRestartWithRequestForPermissions()
-        {
-            DebugLogger.Log("Restarting patcher with request for permissions.");
+					throw;
+				}
+				finally
+				{
+					_state.Value = PatcherState.None;
 
-            try
-            {
-                RuntimePlatform applicationPlatform = default(RuntimePlatform);
-                string applicationDataPath = string.Empty;
+					_updaterStatus.Value = null;
+					_updateAppCancellationTokenSource = null;
+				}
+			}
+		}
 
-                UnityDispatcher.Invoke(() =>
-                {
-                    applicationPlatform = Application.platform;
-                    applicationDataPath = Application.dataPath;
-                }).WaitOne();
+		private bool ThreadTryRestartWithRequestForPermissions()
+		{
+			DebugLogger.Log("Restarting patcher with request for permissions.");
 
-                if (applicationPlatform == RuntimePlatform.WindowsPlayer)
-                {
-                    var info = new ProcessStartInfo
-                    {
-                        FileName = applicationDataPath.Replace("_Data", ".exe"),
-                        Arguments =
-                            string.Join(" ", Environment.GetCommandLineArgs().Select(s => "\"" + s + "\"").ToArray()),
-                        UseShellExecute = true,
-                        Verb = "runas"
-                    };
+			try
+			{
+				RuntimePlatform applicationPlatform = default(RuntimePlatform);
+				string applicationDataPath = string.Empty;
 
-                    Process.Start(info);
+				UnityDispatcher.Invoke(() =>
+				{
+					applicationPlatform = Application.platform;
+					applicationDataPath = Application.dataPath;
+				}).WaitOne();
 
-                    DebugLogger.Log("Patcher restarted with request for permissions.");
+				if (applicationPlatform == RuntimePlatform.WindowsPlayer)
+				{
+					var info = new ProcessStartInfo
+					{
+						FileName = applicationDataPath.Replace("_Data", ".exe"),
+						Arguments =
+							string.Join(" ", Environment.GetCommandLineArgs().Select(s => "\"" + s + "\"").ToArray()),
+						UseShellExecute = true,
+						Verb = "runas"
+					};
 
-                    return true;
-                }
+					Process.Start(info);
 
-                DebugLogger.Log(string.Format("Restarting patcher with request for permissions not possible: unsupported platform {0}.", applicationPlatform));
+					DebugLogger.Log("Patcher restarted with request for permissions.");
 
-                return false;
-            }
-            catch (ThreadInterruptedException)
-            {
-                DebugLogger.Log("Restarting patcher with request for permissions interrupted: thread has been interrupted. Rethrowing exception.");
-                throw;
-            }
-            catch (ThreadAbortException)
-            {
-                DebugLogger.Log("Restarting patcher with request for permissions aborted: thread has been aborted. Rethrowing exception.");
-                throw;
-            }
-            catch (Exception exception)
-            {
-                DebugLogger.LogWarning("Error while restarting patcher with request for permissions: an exception has occured.");
-                DebugLogger.LogException(exception);
+					return true;
+				}
 
-                return false;
-            }
-        }
-    }
+				DebugLogger.Log(string.Format("Restarting patcher with request for permissions not possible: unsupported platform {0}.", applicationPlatform));
+
+				return false;
+			}
+			catch (ThreadInterruptedException)
+			{
+				DebugLogger.Log("Restarting patcher with request for permissions interrupted: thread has been interrupted. Rethrowing exception.");
+				throw;
+			}
+			catch (ThreadAbortException)
+			{
+				DebugLogger.Log("Restarting patcher with request for permissions aborted: thread has been aborted. Rethrowing exception.");
+				throw;
+			}
+			catch (Exception exception)
+			{
+				DebugLogger.LogWarning("Error while restarting patcher with request for permissions: an exception has occured.");
+				DebugLogger.LogException(exception);
+
+				return false;
+			}
+		}
+	}
 }

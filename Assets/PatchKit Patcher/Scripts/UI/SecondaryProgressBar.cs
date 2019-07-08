@@ -1,4 +1,5 @@
 ﻿using PatchKit.Unity.Utilities;
+using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,7 +8,7 @@ namespace PatchKit.Unity.Patcher.UI
 {
     public class SecondaryProgressBar : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         public Image Image;
 

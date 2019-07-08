@@ -3,12 +3,13 @@ using PatchKit.Unity.Utilities;
 using UnityEngine;
 using UnityEngine.UI;
 using UniRx;
+using TMPro;
 
 namespace PatchKit.Unity.Patcher.UI
 {
     public class DownloadStatus : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         private void Start()
         {

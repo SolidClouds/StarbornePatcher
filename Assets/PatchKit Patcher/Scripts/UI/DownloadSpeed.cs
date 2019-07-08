@@ -2,6 +2,7 @@
 using System.Linq;
 using PatchKit.Unity.Patcher.AppUpdater.Status;
 using PatchKit.Unity.Utilities;
+using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,7 +11,7 @@ namespace PatchKit.Unity.Patcher.UI
 {
     public class DownloadSpeed : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         private string _downloadSpeedUnit;
 

@@ -1,13 +1,14 @@
 ﻿using System.Collections;
 using PatchKit.Unity.Patcher.Cancellation;
 using PatchKit.Unity.Utilities;
+using TMPro;
 using UnityEngine.UI;
 
 namespace PatchKit.Unity.UI
 {
     public class AppLatestVersionLabelText : AppCompontent
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         protected override IEnumerator LoadCoroutine()
         {
@@ -22,7 +23,7 @@ namespace PatchKit.Unity.UI
         {
             if (Text == null)
             {
-                Text = GetComponent<Text>();
+                Text = GetComponent<TextMeshProUGUI>();
             }
         }
     }

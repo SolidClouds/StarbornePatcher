@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using PatchKit.Unity.Patcher.AppUpdater.Status;
 using PatchKit.Unity.Utilities;
+using TMPro;
 using UniRx;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,7 +11,7 @@ namespace PatchKit.Unity.Patcher.UI
 {
     public class ProgressBar : MonoBehaviour
     {
-        public Text Text;
+        public TextMeshProUGUI Text;
 
         public Image Image;
 
@@ -40,27 +41,17 @@ namespace PatchKit.Unity.Patcher.UI
             SetProgressBar(0, progress);
         }
 
-        private void SetProgressBarText(string text)
-        {
-            Text.text = text;
-        }
+		private void SetProgressBarText(string text) => Text.text = text;
 
-        private void SetProgress(UpdateData data)
-        {
-        }
-
-        private void SetIdle()
+		private void SetIdle()
         {
             SetProgressBarText("Connecting...");
             _isIdle = true;
         }
 
-        private string FormatProgressForDisplay(double progress)
-        {
-            return string.Format("{0:0.0}", progress * 100.0) + "%";
-        }
+		private string FormatProgressForDisplay(double progress) => $"{progress * 100.0:0.0}%";
 
-        private void OnUpdate(UpdateData data)
+		private void OnUpdate(UpdateData data)
         {
             _isIdle = false;
 
