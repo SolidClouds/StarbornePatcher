@@ -254,6 +254,11 @@ namespace PatchKit.Unity.Patcher
 			DebugLogger.LogFormat("System version: {0}", EnvironmentInfo.GetSystemVersion());
 			DebugLogger.LogFormat("Runtime version: {0}", EnvironmentInfo.GetSystemVersion());
 
+			// In .NET API ProcessPriorityClass.Idle is really 'Low' process priority
+			// Process.GetCurrentProcess().PriorityClass = System.Diagnostics.ProcessPriorityClass.Idle;
+
+			// DebugLogger.LogFormat("Process priority has been set to Low");
+
 			CheckEditorAppSecretSecure();
 
 			if (_canStartThread)
@@ -506,9 +511,9 @@ namespace PatchKit.Unity.Patcher
 					};
 				}).WaitOne();
 #else
-                DebugLogger.Log("Using command line patcher data reader.");
-                var inputArgumentsPatcherDataReader = new InputArgumentsPatcherDataReader();
-                _data.Value = inputArgumentsPatcherDataReader.Read();
+				DebugLogger.Log("Using command line patcher data reader.");
+				var inputArgumentsPatcherDataReader = new InputArgumentsPatcherDataReader();
+				_data.Value = inputArgumentsPatcherDataReader.Read();
 #endif
 				DebugLogger.LogVariable(_data.Value.AppSecret, "Data.AppSecret");
 				DebugLogger.LogVariable(_data.Value.AppDataPath, "Data.AppDataPath");
