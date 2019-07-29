@@ -6,4 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/PatchKit Patcher/Patcher.unity
+    path: Assets/Starborne/StarbornePatcher.unity
+    guid: 45a07fbeef3b8364ea2300245976b658
+  m_configObjects: {}
