@@ -524,7 +524,7 @@ PlayerSettings:
     iOS: 1
   il2cppCompilerConfiguration: {}
   managedStrippingLevel:
-    Standalone: 1
+    Standalone: 0
   incrementalIl2cppBuild:
     iOS: 1
   allowUnsafeCode: 0
