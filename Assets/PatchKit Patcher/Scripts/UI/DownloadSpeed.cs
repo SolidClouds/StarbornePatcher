@@ -9,135 +9,137 @@ using UnityEngine.UI;
 
 namespace PatchKit.Unity.Patcher.UI
 {
-    public class DownloadSpeed : MonoBehaviour
-    {
-        public TextMeshProUGUI Text;
+	public class DownloadSpeed : MonoBehaviour
+	{
+		private TextMeshProUGUI Text;
 
-        private string _downloadSpeedUnit;
+		private string _downloadSpeedUnit;
 
-        private void Start()
-        {
-            var downloadStatus = Patcher.Instance.UpdaterStatus
-                .SelectSwitchOrNull(u => u.LatestActiveOperation)
-                .Select(s => s as IReadOnlyDownloadStatus);
+		private void Start()
+		{
+			Text = GetComponent<TextMeshProUGUI>();
 
-            var downloadSpeedUnit = Patcher.Instance.AppInfo.Select(a => a.PatcherDownloadSpeedUnit);
+			var downloadStatus = Patcher.Instance.UpdaterStatus
+				.SelectSwitchOrNull(u => u.LatestActiveOperation)
+				.Select(s => s as IReadOnlyDownloadStatus);
 
-            var text = downloadStatus.SelectSwitchOrDefault(status =>
-            {
-                var bytesPerSecond = status.BytesPerSecond;
+			var downloadSpeedUnit = Patcher.Instance.AppInfo.Select(a => a.PatcherDownloadSpeedUnit);
 
-                var remainingTime =
-                    status.Bytes.CombineLatest<long, long, double, double?>(status.TotalBytes, bytesPerSecond,
-                        GetRemainingTime);
+			var text = downloadStatus.SelectSwitchOrDefault(status =>
+			{
+				var bytesPerSecond = status.BytesPerSecond;
 
-                var formattedRemainingTime = remainingTime.Select<double?, string>(GetFormattedRemainingTime);
+				var remainingTime =
+					status.Bytes.CombineLatest<long, long, double, double?>(status.TotalBytes, bytesPerSecond,
+						GetRemainingTime);
 
-                var formattedDownloadSpeed =
-                    bytesPerSecond.CombineLatest<double, string, string>(downloadSpeedUnit,
-                        GetFormattedDownloadSpeed);
+				var formattedRemainingTime = remainingTime.Select<double?, string>(GetFormattedRemainingTime);
 
-                return formattedDownloadSpeed.CombineLatest<string, string, string>(formattedRemainingTime,
-                    GetStatusText);
-            }, string.Empty);
+				var formattedDownloadSpeed =
+					bytesPerSecond.CombineLatest<double, string, string>(downloadSpeedUnit,
+						GetFormattedDownloadSpeed);
 
-            text.ObserveOnMainThread().SubscribeToText(Text).AddTo(this);
-        }
+				return formattedDownloadSpeed.CombineLatest<string, string, string>(formattedRemainingTime,
+					GetStatusText);
+			}, string.Empty);
 
-        private static string GetStatusText(string formattedDownloadSpeed, string formattedRemainingTime)
-        {
-            return formattedDownloadSpeed + " " + formattedRemainingTime;
-        }
+			text.ObserveOnMainThread().SubscribeToText(Text).AddTo(this);
+		}
 
-        private static string GetFormattedDownloadSpeed(double bytesPerSecond, string downloadSpeedUnit)
-        {
-            switch (downloadSpeedUnit)
-            {
-                case "kilobytes":
-                    return FormatDownloadSpeedKilobytes(bytesPerSecond);
-                case "megabytes":
-                    return FormatDownloadSpeedMegabytes(bytesPerSecond);
-                default: // "human_readable" and any other
-                {
-                    return bytesPerSecond > Units.MB
-                        ? FormatDownloadSpeedMegabytes(bytesPerSecond)
-                        : FormatDownloadSpeedKilobytes(bytesPerSecond);
-                }
-            }
-        }
+		private static string GetStatusText(string formattedDownloadSpeed, string formattedRemainingTime)
+		{
+			return formattedDownloadSpeed + " " + formattedRemainingTime;
+		}
 
-        private static string FormatDownloadSpeedMegabytes(double bytesPerSecond)
-        {
-            return FormatDownloadSpeed(bytesPerSecond / Units.MB) + " MB/sec.";
-        }
+		private static string GetFormattedDownloadSpeed(double bytesPerSecond, string downloadSpeedUnit)
+		{
+			switch (downloadSpeedUnit)
+			{
+				case "kilobytes":
+					return FormatDownloadSpeedKilobytes(bytesPerSecond);
+				case "megabytes":
+					return FormatDownloadSpeedMegabytes(bytesPerSecond);
+				default: // "human_readable" and any other
+				{
+					return bytesPerSecond > Units.MB
+						? FormatDownloadSpeedMegabytes(bytesPerSecond)
+						: FormatDownloadSpeedKilobytes(bytesPerSecond);
+				}
+			}
+		}
 
-        private static string FormatDownloadSpeedKilobytes(double bytesPerSecond)
-        {
-            return FormatDownloadSpeed(bytesPerSecond / Units.KB) + " KB/sec.";
-        }
+		private static string FormatDownloadSpeedMegabytes(double bytesPerSecond)
+		{
+			return FormatDownloadSpeed(bytesPerSecond / Units.MB) + " MB/sec.";
+		}
 
-        private static string FormatDownloadSpeed(double s)
-        {
-            return s.ToString("#,#0.0");
-        }
+		private static string FormatDownloadSpeedKilobytes(double bytesPerSecond)
+		{
+			return FormatDownloadSpeed(bytesPerSecond / Units.KB) + " KB/sec.";
+		}
 
-        private static string GetFormattedRemainingTime(double? remainingTime)
-        {
-            if (!remainingTime.HasValue)
-            {
-                return string.Empty;
-            }
+		private static string FormatDownloadSpeed(double s)
+		{
+			return s.ToString("#,#0.0");
+		}
 
-            var span = TimeSpan.FromSeconds(remainingTime.Value);
+		private static string GetFormattedRemainingTime(double? remainingTime)
+		{
+			if (!remainingTime.HasValue)
+			{
+				return string.Empty;
+			}
 
-            if (span.TotalDays > 1.0)
-            {
-                return FormatPlural("{0:0} day", span.TotalDays);
-            }
+			var span = TimeSpan.FromSeconds(remainingTime.Value);
 
-            if (span.TotalHours > 1.0)
-            {
-                return FormatPlural("{0:0} hour", span.TotalHours);
-            }
+			if (span.TotalDays > 1.0)
+			{
+				return FormatPlural("{0:0} day", span.TotalDays);
+			}
 
-            if (span.TotalMinutes > 1.0)
-            {
-                return FormatPlural("{0:0} minute", span.TotalMinutes);
-            }
+			if (span.TotalHours > 1.0)
+			{
+				return FormatPlural("{0:0} hour", span.TotalHours);
+			}
 
-            if (span.TotalSeconds > 1.0)
-            {
-                return FormatPlural("{0:0} second", span.TotalSeconds);
-            }
+			if (span.TotalMinutes > 1.0)
+			{
+				return FormatPlural("{0:0} minute", span.TotalMinutes);
+			}
 
-            return "a moment";
-        }
+			if (span.TotalSeconds > 1.0)
+			{
+				return FormatPlural("{0:0} second", span.TotalSeconds);
+			}
 
-        private static double? GetRemainingTime(long bytes, long totalBytes, double bytesPerSecond)
-        {
-            if (bytesPerSecond <= 0.0)
-            {
-                return null;
-            }
+			return "a moment";
+		}
 
-            double remainingBytes = totalBytes - bytes;
+		private static double? GetRemainingTime(long bytes, long totalBytes, double bytesPerSecond)
+		{
+			if (bytesPerSecond <= 0.0)
+			{
+				return null;
+			}
 
-            if (remainingBytes <= 0)
-            {
-                return null;
-            }
+			double remainingBytes = totalBytes - bytes;
 
-            return remainingBytes / bytesPerSecond;
-        }
+			if (remainingBytes <= 0)
+			{
+				return null;
+			}
 
-        private static string FormatPlural(string format, double value)
-        {
-            return string.Format(format, value) + GetPlural(value);
-        }
+			return remainingBytes / bytesPerSecond;
+		}
 
-        private static string GetPlural(double value)
-        {
-            return value.ToString("0") == "1" ? string.Empty : "s";
-        }
-    }
+		private static string FormatPlural(string format, double value)
+		{
+			return string.Format(format, value) + GetPlural(value);
+		}
+
+		private static string GetPlural(double value)
+		{
+			return value.ToString("0") == "1" ? string.Empty : "s";
+		}
+	}
 }

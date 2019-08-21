@@ -5,25 +5,30 @@ using UnityEngine.UI;
 
 namespace PatchKit.Unity.Patcher.UI.Dialogs
 {
-    public class ErrorDialog : Dialog<ErrorDialog>
-    {
-        public TextMeshProUGUI ErrorText;
+	public class ErrorDialog : Dialog<ErrorDialog>
+	{
+		private TextMeshProUGUI text;
 
-        public void Confirm()
-        {
-            OnDisplayed();
-        }
+		public TextMeshProUGUI ErrorText
+		{
+			get => text = text ?? GetComponentInChildren<TextMeshProUGUI>();
+		}
 
-        public void Display(PatcherErrorMessage error, CancellationToken cancellationToken)
-        {
-            UnityDispatcher.Invoke(() => UpdateMessage(error)).WaitOne();
+		public void Confirm()
+		{
+			OnDisplayed();
+		}
 
-            Display(cancellationToken);
-        }
+		public void Display(PatcherErrorMessage error, CancellationToken cancellationToken)
+		{
+			UnityDispatcher.Invoke(() => UpdateMessage(error)).WaitOne();
 
-        private void UpdateMessage(PatcherErrorMessage error)
-        {
-            ErrorText.text = error.Message;
-        }
-    }
+			Display(cancellationToken);
+		}
+
+		private void UpdateMessage(PatcherErrorMessage error)
+		{
+			ErrorText.text = error.Message;
+		}
+	}
 }

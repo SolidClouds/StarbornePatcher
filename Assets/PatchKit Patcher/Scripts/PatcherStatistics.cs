@@ -203,7 +203,7 @@ namespace PatchKit.Unity.Patcher
 
             UnityEngine.Debug.Log("Sending event:\n" + json.ToString(Formatting.Indented));
 
-            yield return request.Send();
+            yield return request.SendWebRequest();
 
 #if UNITY_2017_1_OR_NEWER
             if (request.isNetworkError || request.responseCode != 201)

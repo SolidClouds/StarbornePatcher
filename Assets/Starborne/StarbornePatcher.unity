@@ -284,7 +284,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f7abc4e672fec1489d739f180e7fc42, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Text: {fileID: 50408494}
 --- !u!114 &50408497
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -393,7 +392,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &272161831
 RectTransform:
   m_ObjectHideFlags: 0
@@ -426,7 +425,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e39b61178cc8a0745b5f1df4592f5b42, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ErrorText: {fileID: 1882944061}
 --- !u!95 &272161833
 Animator:
   serializedVersion: 3
@@ -619,7 +617,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aa71e577e8cfe47b8aff3e1c254d0edf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Text: {fileID: 477218057}
 --- !u!114 &477218057
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -946,8 +943,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31c0f7c843c1ffd4cbd9619859d9b37a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 400
-  height: 80
+  width: 0
+  height: 0
   CloseButton: {fileID: 955547002}
 --- !u!114 &776156506
 MonoBehaviour:
@@ -1225,7 +1222,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8aec074ca92a54045be1684ee2a2a63a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Text: {fileID: 788506878}
 --- !u!114 &788506881
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1760,7 +1756,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aa47983fa0075dc489e07057c2d7cb66, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Text: {fileID: 1093006698}
+  RemainingText: {fileID: 1093006698}
   Image: {fileID: 87425942}
 --- !u!225 &1414252207
 CanvasGroup:
@@ -2184,7 +2180,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 951cf4b8d03cf12479f154b7ad6a6aea, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Text: {fileID: 1927476307}
 --- !u!1 &1978714223
 GameObject:
   m_ObjectHideFlags: 0

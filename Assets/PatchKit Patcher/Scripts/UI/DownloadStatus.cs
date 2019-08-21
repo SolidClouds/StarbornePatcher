@@ -7,24 +7,26 @@ using TMPro;
 
 namespace PatchKit.Unity.Patcher.UI
 {
-    public class DownloadStatus : MonoBehaviour
-    {
-        public TextMeshProUGUI Text;
+	public class DownloadStatus : MonoBehaviour
+	{
 
-        private void Start()
-        {
-            var downloadStatus = Patcher.Instance.UpdaterStatus
-                .SelectSwitchOrNull(u => u.LatestActiveOperation)
-                .Select(s => s as IReadOnlyDownloadStatus);
+		private void Start()
+		{
+			var downloadStatusText = GetComponent<TextMeshProUGUI>();
 
-            var text = downloadStatus.SelectSwitchOrDefault(status =>
-            {
-                return status.Bytes.CombineLatest(status.TotalBytes,
-                    (bytes, totalBytes) => string.Format("{0:0.0} MB of {1:0.0} MB", bytes / 1024.0 / 1024.0,
-                        totalBytes / 1024.0 / 1024.0));
-            }, string.Empty);
+			Patcher.Instance.UpdaterStatus
+				.SelectSwitchOrNull(u => u.LatestActiveOperation)
+				.Select(s => s as IReadOnlyDownloadStatus)
+				.SelectSwitchOrDefault(GetDownloadStatus, string.Empty)
+				.ObserveOnMainThread()
+				.SubscribeToText(downloadStatusText)
+				.AddTo(this);
+		}
 
-            text.ObserveOnMainThread().SubscribeToText(Text).AddTo(this);
-        }
-    }
+		private static IObservable<string> GetDownloadStatus(IReadOnlyDownloadStatus status) =>
+			status.Bytes.CombineLatest(
+				status.TotalBytes,
+				(bytes, totalBytes) => $"{bytes / 1024.0 / 1024.0:0.0} MB of {totalBytes / 1024.0 / 1024.0:0.0} MB"
+			);
+	}
 }

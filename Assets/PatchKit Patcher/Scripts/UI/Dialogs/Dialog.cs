@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using PatchKit.Unity.Patcher.Cancellation;
 using UnityEngine;
 using PatchKit.Unity.Patcher.Debug;
