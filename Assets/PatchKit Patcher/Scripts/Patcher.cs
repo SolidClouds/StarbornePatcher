@@ -823,29 +823,29 @@ namespace PatchKit.Unity.Patcher
 			{
 				_state.Value = PatcherState.DisplayingError;
 
-				DebugLogger.Log($"Displaying patcher error {error.Message}...");
+				DebugLogger.Log(string.Format("Displaying patcher error {0}...", error.Message));
 
 				ErrorDialog.Display(error, cancellationToken);
 
-				DebugLogger.Log($"Patcher error {error.Message} displayed.");
+				DebugLogger.Log(string.Format("Patcher error {0} displayed.", error.Message));
 			}
 			catch (OperationCanceledException)
 			{
-				DebugLogger.Log($"Displaying patcher error {_userDecision} cancelled.");
+				DebugLogger.Log(string.Format("Displaying patcher error {0} cancelled.", _userDecision));
 			}
 			catch (ThreadInterruptedException)
 			{
-				DebugLogger.Log($"Displaying patcher error {error.Message} interrupted: thread has been interrupted. Rethrowing exception.");
+				DebugLogger.Log(string.Format("Displaying patcher error {0} interrupted: thread has been interrupted. Rethrowing exception.", error.Message));
 				throw;
 			}
 			catch (ThreadAbortException)
 			{
-				DebugLogger.Log($"Displaying patcher error {error.Message} aborted: thread has been aborted. Rethrowing exception.");
+				DebugLogger.Log(string.Format("Displaying patcher error {0} aborted: thread has been aborted. Rethrowing exception.", error.Message));
 				throw;
 			}
 			catch (Exception)
 			{
-				DebugLogger.LogWarning($"Error while displaying patcher error {error.Message}: an exception has occured. Rethrowing exception.");
+				DebugLogger.LogWarning(string.Format("Error while displaying patcher error {}: an exception has occured. Rethrowing exception.", error.Message));
 				throw;
 			}
 		}

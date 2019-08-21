@@ -43,7 +43,10 @@ namespace PatchKit.Unity.Patcher.UI
 			SetProgressBar(0, progress);
 		}
 
-		private void SetProgressBarText(string text) => RemainingText.text = text;
+		private void SetProgressBarText(string text)
+		{
+			RemainingText.text = text;
+		}
 
 		private void SetProgress(UpdateData data)
 		{
@@ -55,7 +58,10 @@ namespace PatchKit.Unity.Patcher.UI
 			_isIdle = true;
 		}
 
-		private string FormatProgressForDisplay(double progress) => $"{progress * 100.0:0.0}%";
+		private string FormatProgressForDisplay(double progress)
+		{
+			return string.Format("{0:0.0}%", progress * 100.0);
+		}
 
 		private void OnUpdate(UpdateData data)
 		{

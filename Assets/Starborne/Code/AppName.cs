@@ -14,7 +14,7 @@ public class AppName : MonoBehaviour
 
 		Patcher.Instance.AppInfo
 				.ObserveOnMainThread()
-				.Where(app => app.Id != default)
+				.Where(app => app.Id != default(int))
 				.Select(app => app.DisplayName)
 				.Subscribe(app => text.text = "Updating: " + app);
 	}

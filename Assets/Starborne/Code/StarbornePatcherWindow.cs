@@ -11,15 +11,12 @@ using UnityEngine.UI;
 
 public class StarbornePatcherWindow : MonoBehaviour
 {
-	public int width;
-	public int height;
-
 	public Button CloseButton;
 
 	private void Awake()
 	{
-		var w = width * Screen.dpi / 100f;
-		var h = height * Screen.dpi / 100f;
+		var w = 400 * Screen.dpi / 100f;
+		var h = 80 * Screen.dpi / 100f;
 
 		Screen.SetResolution((int)w, (int)h, false);
 
@@ -50,7 +47,7 @@ public class StarbornePatcherWindow : MonoBehaviour
 		patcher.UpdaterStatus
 			.SelectSwitchOrNull(u => u.LatestActiveOperation)
 			.Select(s => s as IReadOnlyDownloadStatus)
-			.SelectSwitchOrDefault(status => status.Bytes.CombineLatest(status.TotalBytes, status.BytesPerSecond, (b, tb, bps) => new PatcherDownloadStatus { Bytes = b, TotalBytes = tb, BytesPerSecond = bps }), default)
+			.SelectSwitchOrDefault(status => status.Bytes.CombineLatest(status.TotalBytes, status.BytesPerSecond, (b, tb, bps) => new PatcherDownloadStatus { Bytes = b, TotalBytes = tb, BytesPerSecond = bps }), default(PatcherDownloadStatus))
 			.ObserveOnMainThread()
 			.Subscribe(data => LauncherRelay.Send(PatcherMessageType.DownloadInfo, data))
 			.AddTo(this);
@@ -81,7 +78,7 @@ public class StarbornePatcherWindow : MonoBehaviour
 		{
 			var process = System.Diagnostics.Process.GetCurrentProcess();
 			var rootPath = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(process.MainModule.FileName), ".."));
-			Debug.Log($"Patcher Root Path: {rootPath}");
+			Debug.Log("Patcher Root Path: " + rootPath);
 		}
 		finally { }
 	}

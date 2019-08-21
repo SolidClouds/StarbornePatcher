@@ -11,7 +11,10 @@ namespace PatchKit.Unity.Patcher.UI.Dialogs
 
 		public TextMeshProUGUI ErrorText
 		{
-			get => text = text ?? GetComponentInChildren<TextMeshProUGUI>();
+			get
+			{
+				return text = text ?? GetComponentInChildren<TextMeshProUGUI>();
+			}
 		}
 
 		public void Confirm()

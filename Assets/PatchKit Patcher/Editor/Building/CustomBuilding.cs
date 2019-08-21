@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
 using System.Diagnostics;
@@ -54,11 +54,11 @@ namespace PatchKit.Unity
             {
                 case BuildTarget.StandaloneWindows:
                 case BuildTarget.StandaloneWindows64:
-                    return "Patcher.exe";
+                    return "StarbornePatcher.exe";
                 case BuildTarget.StandaloneLinux:
                 case BuildTarget.StandaloneLinux64:
                 case BuildTarget.StandaloneLinuxUniversal:
-                    return "Patcher";
+                    return "StarbornePatcher";
 #if UNITY_2017_3_OR_NEWER
                 case BuildTarget.StandaloneOSX:
 #else

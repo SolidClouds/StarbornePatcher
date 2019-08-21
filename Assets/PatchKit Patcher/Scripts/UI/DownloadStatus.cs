@@ -23,10 +23,12 @@ namespace PatchKit.Unity.Patcher.UI
 				.AddTo(this);
 		}
 
-		private static IObservable<string> GetDownloadStatus(IReadOnlyDownloadStatus status) =>
-			status.Bytes.CombineLatest(
-				status.TotalBytes,
-				(bytes, totalBytes) => $"{bytes / 1024.0 / 1024.0:0.0} MB of {totalBytes / 1024.0 / 1024.0:0.0} MB"
-			);
+		private static IObservable<string> GetDownloadStatus(IReadOnlyDownloadStatus status)
+		{
+			return status.Bytes.CombineLatest(
+					status.TotalBytes,
+					(bytes, totalBytes) => string.Format("{0:0.0} MB of {1:0.0} MB", bytes / 1024.0 / 1024.0, totalBytes / 1024.0 / 1024.0)
+				);
+		}
 	}
 }

@@ -6,88 +6,99 @@ using UnityEngine.UI;
 
 namespace PatchKit.Unity.Patcher.UI.Dialogs
 {
-    public class LicenseDialog : Dialog<LicenseDialog>, ILicenseDialog
+	public class LicenseDialog : Dialog<LicenseDialog>, ILicenseDialog
 	{
-		public static new LicenseDialog Instance { get; } = new LicenseDialog();
+		public static new LicenseDialog Instance
+		{
+			get
+			{
+				return instance;
+			}
+			private set
+			{
+				instance = value;
+			}
+		}
 
 		private LicenseDialogResult _result;
 
-        public Text ErrorMessageText;
+		public Text ErrorMessageText;
 
-        public InputField KeyInputField;
+		public InputField KeyInputField;
 
-        [Multiline]
-        public string InvalidLicenseMessageText;
+		[Multiline]
+		public string InvalidLicenseMessageText;
 
-        [Multiline]
-        public string BlockedLicenseMessageText;
+		[Multiline]
+		public string BlockedLicenseMessageText;
 
-        [Multiline]
-        public string ServiceUnavailableMessageText;
+		[Multiline]
+		public string ServiceUnavailableMessageText;
+		private static LicenseDialog instance = new LicenseDialog();
 
-        public void Confirm()
-        {
-            string key = KeyInputField.text;
-            key = key.ToUpper().Trim();
+		public void Confirm()
+		{
+			string key = KeyInputField.text;
+			key = key.ToUpper().Trim();
 
-            if (string.IsNullOrEmpty(key))
-            {
-                return;
-            }
+			if (string.IsNullOrEmpty(key))
+			{
+				return;
+			}
 
-            _result = new LicenseDialogResult
-            {
-                Key = key,
-                Type = LicenseDialogResultType.Confirmed
-            };
+			_result = new LicenseDialogResult
+			{
+				Key = key,
+				Type = LicenseDialogResultType.Confirmed
+			};
 
-            base.OnDisplayed();
-        }
+			base.OnDisplayed();
+		}
 
-        public void Abort()
-        {
-            _result = new LicenseDialogResult
-            {
-                Key = null,
-                Type = LicenseDialogResultType.Aborted
-            };
+		public void Abort()
+		{
+			_result = new LicenseDialogResult
+			{
+				Key = null,
+				Type = LicenseDialogResultType.Aborted
+			};
 
-            base.OnDisplayed();
-        }
+			base.OnDisplayed();
+		}
 
-        public void SetKey(string key)
-        {
-            UnityDispatcher.Invoke(() => KeyInputField.text = key);
-        }
+		public void SetKey(string key)
+		{
+			UnityDispatcher.Invoke(() => KeyInputField.text = key);
+		}
 
-        public LicenseDialogResult Display(LicenseDialogMessageType messageType)
-        {
-            UnityDispatcher.Invoke(() => UpdateMessage(messageType));
+		public LicenseDialogResult Display(LicenseDialogMessageType messageType)
+		{
+			UnityDispatcher.Invoke(() => UpdateMessage(messageType));
 
-            base.Display(CancellationToken.Empty);
+			base.Display(CancellationToken.Empty);
 
-            return _result;
-        }
+			return _result;
+		}
 
-        private void UpdateMessage(LicenseDialogMessageType messageType)
-        {
-            switch (messageType)
-            {
-                case LicenseDialogMessageType.None:
-                    ErrorMessageText.text = string.Empty;
-                    break;
-                case LicenseDialogMessageType.InvalidLicense:
-                    ErrorMessageText.text = InvalidLicenseMessageText;
-                    break;
-                case LicenseDialogMessageType.BlockedLicense:
-                    ErrorMessageText.text = BlockedLicenseMessageText;
-                    break;
-                case LicenseDialogMessageType.ServiceUnavailable:
-                    ErrorMessageText.text = ServiceUnavailableMessageText;
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException("messageType", messageType, null);
-            }
-        }
-    }
+		private void UpdateMessage(LicenseDialogMessageType messageType)
+		{
+			switch (messageType)
+			{
+				case LicenseDialogMessageType.None:
+					ErrorMessageText.text = string.Empty;
+					break;
+				case LicenseDialogMessageType.InvalidLicense:
+					ErrorMessageText.text = InvalidLicenseMessageText;
+					break;
+				case LicenseDialogMessageType.BlockedLicense:
+					ErrorMessageText.text = BlockedLicenseMessageText;
+					break;
+				case LicenseDialogMessageType.ServiceUnavailable:
+					ErrorMessageText.text = ServiceUnavailableMessageText;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException("messageType", messageType, null);
+			}
+		}
+	}
 }
