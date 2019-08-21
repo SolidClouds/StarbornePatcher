@@ -22,6 +22,8 @@ namespace PatchKit.Unity.Patcher.UI
             public PatcherState State;
 
             public bool IsAppInstalled;
+
+            public bool IsIdle;
         }
 
         private void SetProgressBar(float start, float end)
@@ -43,9 +45,13 @@ namespace PatchKit.Unity.Patcher.UI
 
 		private void SetProgressBarText(string text) => Text.text = text;
 
-		private void SetIdle()
+        private void SetProgress(UpdateData data)
         {
-            SetProgressBarText("Connecting...");
+        }
+
+        private void SetIdle(string text)
+        {
+            SetProgressBarText(text);
             _isIdle = true;
         }
 
@@ -60,13 +66,19 @@ namespace PatchKit.Unity.Patcher.UI
                 case PatcherState.LoadingPatcherData:
                 case PatcherState.LoadingPatcherConfiguration:
                 case PatcherState.Connecting:
-                    SetIdle();
+                    SetIdle("Connecting...");
                     return;
 
                 case PatcherState.UpdatingApp:
+                    if (data.IsIdle)
+                    {
+                        SetIdle(string.Empty);
+                        return;
+                    }
+
                     if (data.Progress <= 0)
                     {
-                        SetIdle();
+                        SetIdle("Connecting...");
                         return;
                     }
 
@@ -107,13 +119,17 @@ namespace PatchKit.Unity.Patcher.UI
         private void Start()
         {
             var progress = Patcher.Instance.UpdaterStatus.SelectSwitchOrDefault(p => p.Progress, -1.0);
+            var isUpdatingIdle = Patcher.Instance.UpdaterStatus
+                .SelectSwitchOrDefault(p => (IObservable<IReadOnlyOperationStatus>) p.LatestActiveOperation, (IReadOnlyOperationStatus) null)
+                .SelectSwitchOrDefault(p => p.IsIdle, false);
 
             Patcher.Instance.State
-                .CombineLatest(progress, Patcher.Instance.IsAppInstalled,
-                    (state, progressValue, isAppInstalled) => new UpdateData {
+                .CombineLatest(progress, Patcher.Instance.IsAppInstalled, isUpdatingIdle,
+                    (state, progressValue, isAppInstalled, isUpdatingIdleValue) => new UpdateData {
                         Progress = progressValue,
                         State = state,
-                        IsAppInstalled = isAppInstalled
+                        IsAppInstalled = isAppInstalled,
+                        IsIdle = isUpdatingIdleValue
                         })
                 .ObserveOnMainThread()
                 .Subscribe(OnUpdate)
